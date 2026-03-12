@@ -2,6 +2,7 @@ import os
 from typing import Optional
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine.url import make_url
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,12 +10,8 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 START_DATE = os.getenv("BOT_START_DATE")
 
-# Normalizar esquema y forzar driver pg8000 (pure Python, compatible con cualquier Python)
-_url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-if "postgresql+pg8000://" not in _url:
-    _url = _url.replace("postgresql://", "postgresql+pg8000://", 1)
-
-_engine = create_engine(_url)
+# Usar make_url para evitar bugs de string manipulation y forzar driver pg8000
+_engine = create_engine(make_url(DATABASE_URL).set(drivername="postgresql+pg8000"))
 
 
 def query_df(sql: str, params: Optional[dict] = None) -> pd.DataFrame:
