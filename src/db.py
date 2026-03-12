@@ -1,7 +1,5 @@
 import os
 from typing import Optional
-import psycopg2
-import psycopg2.extras
 import pandas as pd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
@@ -11,15 +9,12 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 START_DATE = os.getenv("BOT_START_DATE")
 
-# SQLAlchemy 2.0 requiere postgresql://, Supabase entrega postgres://
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# Normalizar esquema y forzar driver pg8000 (pure Python, compatible con cualquier Python)
+_url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+if "postgresql+pg8000://" not in _url:
+    _url = _url.replace("postgresql://", "postgresql+pg8000://", 1)
 
-_engine = create_engine(DATABASE_URL)
-
-
-def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+_engine = create_engine(_url)
 
 
 def query_df(sql: str, params: Optional[dict] = None) -> pd.DataFrame:
@@ -68,36 +63,28 @@ def get_kpis(city: Optional[str] = None) -> dict:
         cq = ""
         params = {"start": START_DATE}
 
+    # Rewrite usando named params para query_df (SQLAlchemy text)
+    cq_named = cq.replace("%(city)s", ":city").replace("%(start)s", ":start")
     sql = f"""
         SELECT
             (SELECT COUNT(DISTINCT s.client_number)
                FROM ama.ama_session_start_table s
-              WHERE DATE(s.created_at AT TIME ZONE 'America/Bogota') >= %(start)s {cq})  AS total_usuarios,
-
-            (SELECT COUNT(DISTINCT s.client_number)
-               FROM ama.ama_session_start_table s
-              WHERE DATE(s.created_at AT TIME ZONE 'America/Bogota') >= %(start)s {cq})  AS usuarios_con_sesion,
+              WHERE DATE(s.created_at AT TIME ZONE 'America/Bogota') >= :start {cq_named})  AS total_usuarios,
 
             (SELECT COUNT(*)
                FROM ama.ama_session_start_table s
-              WHERE DATE(s.created_at AT TIME ZONE 'America/Bogota') >= %(start)s {cq})  AS total_inicios,
+              WHERE DATE(s.created_at AT TIME ZONE 'America/Bogota') >= :start {cq_named})  AS total_inicios,
 
             (SELECT COUNT(DISTINCT r.client_number)
                FROM ama.ama_sessions_responses r
-              WHERE DATE(r.created_at AT TIME ZONE 'America/Bogota') >= %(start)s {cq})  AS usuarios_con_resp,
-
-            (SELECT COUNT(*)
-               FROM ama.ama_sessions_responses r
-              WHERE DATE(r.created_at AT TIME ZONE 'America/Bogota') >= %(start)s {cq})  AS total_respuestas,
+              WHERE DATE(r.created_at AT TIME ZONE 'America/Bogota') >= :start {cq_named})  AS usuarios_con_resp,
 
             (SELECT COUNT(DISTINCT s.client_number)
                FROM ama.ama_session_start_table s
-              WHERE s.created_at >= NOW() - INTERVAL '7 days' {cq})                      AS activos_7d
+              WHERE s.created_at >= NOW() - INTERVAL '7 days' {cq_named})                  AS activos_7d
     """
-    with get_connection() as conn:
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(sql, params)
-        return dict(cur.fetchone())
+    row = query_df(sql, params)
+    return row.iloc[0].to_dict()
 
 
 # ── Actividad por día ─────────────────────────────────────────────────────────
