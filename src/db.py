@@ -8,8 +8,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 START_DATE = os.getenv("BOT_START_DATE")
+
+# SQLAlchemy 2.0 requiere postgresql://, Supabase entrega postgres://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 _engine = create_engine(DATABASE_URL)
 
