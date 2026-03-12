@@ -121,6 +121,11 @@ hr {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #080808; }
 ::-webkit-scrollbar-thumb { background: #1E1E1E; }
+
+/* Ocultar ícono keyboard_double_arrow de Streamlit 1.55 */
+[data-testid="stSelectbox"] svg,
+[data-testid="stDateInput"] svg,
+button[data-testid="stBaseButton-minimal"] svg { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -139,8 +144,6 @@ def _base_layout(**kwargs) -> dict:
         paper_bgcolor="#0D0D0D",
         plot_bgcolor="#0D0D0D",
         font=_FONT,
-        title_font=dict(family="IBM Plex Mono, monospace", color="#FFB300", size=11),
-        title_x=0,
         xaxis=dict(
             showgrid=True, gridcolor="#151515", gridwidth=1,
             zeroline=False, tickfont=_FONT,

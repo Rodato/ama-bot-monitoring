@@ -283,7 +283,7 @@ def get_daily_users_by_gender(
     school_clause = "AND u.school = :school" if school else ""
     sql = f"""
         SELECT
-            DATE(s.created_at AT TIME ZONE 'America/Bogota') AS fecha,
+            DATE(s.created_at AT TIME ZONE 'America/Bogota')::text AS fecha,
             COALESCE(u.gender, 'Sin registrar') AS gender,
             COUNT(DISTINCT s.client_number) AS usuarios
         FROM ama.ama_session_start_table s
