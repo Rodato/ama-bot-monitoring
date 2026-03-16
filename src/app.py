@@ -8,6 +8,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 import db
+import user_report
 
 st.set_page_config(
     page_title="AMA BOT · MONITOR",
@@ -220,6 +221,10 @@ def _get_daily_users_by_school_v2(schools_tuple, city, date_from, date_to, _d):
     )
 
 @st.cache_data(show_spinner=False)
+def _build_user_report_bytes(date_from_str, date_to_str):
+    return user_report.generate_user_report_bytes(date_from_str, date_to_str)
+
+@st.cache_data(show_spinner=False)
 def _get_users_by_session_and_gender(city, date_from, date_to, _d, school=None):
     return db.get_users_by_session_and_gender(
         city=city, date_from=str(date_from), date_to=str(date_to), school=school,
@@ -262,7 +267,7 @@ st.divider()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tab1, tab2 = st.tabs(["▣  INDICADORES GENERALES", "▣  POR COLEGIO"])
+tab1, tab2, tab3 = st.tabs(["▣  INDICADORES GENERALES", "▣  POR COLEGIO", "▣  REPORTES"])
 
 # ════════════════════════════════════════════════════════════════════════════════
 # TAB 1 — INDICADORES GENERALES
@@ -505,3 +510,49 @@ with tab2:
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("NO DATA")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 3 — REPORTES
+# ════════════════════════════════════════════════════════════════════════════════
+
+with tab3:
+    st.subheader("REPORTE DE USUARIOS")
+    st.caption("GENERA UN EXCEL POR CIUDAD CON EL DETALLE DE CADA USUARIO Y SUS SESIONES")
+
+    st.divider()
+
+    col_from, col_to = st.columns(2)
+    with col_from:
+        r_from = st.date_input(
+            "DESDE",
+            value=date.fromisoformat(db.START_DATE),
+            min_value=date.fromisoformat(db.START_DATE),
+            max_value=date.today(),
+            key="report_from",
+        )
+    with col_to:
+        r_to = st.date_input(
+            "HASTA",
+            value=date.today(),
+            min_value=date.fromisoformat(db.START_DATE),
+            max_value=date.today(),
+            key="report_to",
+        )
+
+    st.divider()
+
+    if r_from > r_to:
+        st.warning("LA FECHA DE INICIO DEBE SER ANTERIOR A LA FECHA FIN")
+    else:
+        with st.spinner("GENERANDO REPORTE..."):
+            excel_bytes = _build_user_report_bytes(str(r_from), str(r_to))
+
+        fname = f"reporte_usuarios_{r_from}_{r_to}.xlsx"
+        st.download_button(
+            label="⬇  DESCARGAR EXCEL",
+            data=excel_bytes,
+            file_name=fname,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        st.caption(f"ARCHIVO · {fname}")
