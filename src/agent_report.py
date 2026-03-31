@@ -29,22 +29,26 @@ def build_prompt(summary: str, fecha_inicio: str, fecha_fin: str) -> str:
     return f"""Eres un analista del programa educativo AMA. Tienes los datos de uso del bot WhatsApp para la semana del {fecha_inicio} al {fecha_fin}.
 
 Los datos están organizados en tres dimensiones:
-- **Por Ciudad**: usuarios activos por ciudad y género, por día
-- **Por Colegio**: usuarios activos por institución y género, por día
-- **Por Salón**: usuarios activos por salón/curso y género, por día
+- Por Ciudad: usuarios activos por ciudad y género, por día
+- Por Colegio: usuarios activos por institución y género, por día
+- Por Salón: usuarios activos por salón/curso y género, por día
 
 DATOS:
 {summary}
 
-Genera un reporte ejecutivo en español con las siguientes secciones:
+Escribe un reporte narrativo en español, en prosa continua (sin títulos, sin secciones, sin bullets, sin markdown). Un solo bloque de texto de 4 a 6 párrafos cortos.
 
-1. **Resumen de la semana** (3-4 oraciones con los números clave: total usuarios activos, días con mayor actividad, distribución de género general)
-2. **Participación por ciudad** (qué ciudades tuvieron más actividad, diferencias de género destacadas)
-3. **Participación por colegio** (colegios con mayor y menor participación, patrones relevantes)
-4. **Participación por salón** (salones más activos, observaciones)
-5. **Puntos de atención** (máximo 4 bullets con situaciones que requieren seguimiento)
+El reporte debe cubrir, en este orden:
+1. Total de usuarios activos en la semana, distribución de género y días con mayor actividad.
+2. Participación por ciudad: cuál lideró, porcentajes, diferencias relevantes.
+3. Colegios con mayor y menor participación, con los números clave y patrones relevantes entre ciudades.
+4. Si hay algo que llame la atención o requiera seguimiento (sin exagerar; omitir si no hay nada importante).
 
-Sé específico y usa los números reales. No inventes datos. Tono profesional pero directo.
+Reglas estrictas:
+- Solo prosa. Ningún encabezado, bullet, numeración ni formato markdown.
+- Usa los números reales de los datos. No inventes ni redondees innecesariamente.
+- No menciones salones a menos que haya algo verdaderamente destacable.
+- Tono profesional y directo. Sin frases de relleno ni conclusiones genéricas.
 """
 
 

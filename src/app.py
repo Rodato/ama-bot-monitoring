@@ -230,6 +230,14 @@ def _get_users_by_session_and_gender(city, date_from, date_to, _d, school=None):
         city=city, date_from=str(date_from), date_to=str(date_to), school=school,
     )
 
+@st.cache_data(show_spinner=False)
+def _get_school_leaderboard(city, date_from, date_to, _d):
+    return db.get_school_leaderboard(city=city, date_from=str(date_from), date_to=str(date_to))
+
+@st.cache_data(show_spinner=False)
+def _get_student_leaderboard(city, date_from, date_to, _d):
+    return db.get_student_leaderboard(city=city, date_from=str(date_from), date_to=str(date_to))
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -267,7 +275,7 @@ st.divider()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tab1, tab2, tab3 = st.tabs(["▣  INDICADORES GENERALES", "▣  POR COLEGIO", "▣  REPORTES"])
+tab1, tab2, tab3, tab4 = st.tabs(["▣  INDICADORES GENERALES", "▣  POR COLEGIO", "▣  LEADERBOARD", "▣  REPORTES"])
 
 # ════════════════════════════════════════════════════════════════════════════════
 # TAB 1 — INDICADORES GENERALES
@@ -513,10 +521,105 @@ with tab2:
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# TAB 3 — REPORTES
+# TAB 3 — LEADERBOARD
 # ════════════════════════════════════════════════════════════════════════════════
 
+def _lb_table(df, col_defs, medal_col):
+    """Render a leaderboard DataFrame as a Bloomberg-style HTML table.
+
+    col_defs: list of (attr_name, header_label, align)
+    medal_col: index (0-based) of the numeric column used to highlight leaders
+    """
+    medal_colors = {1: "#FFB300", 2: "#888888", 3: "#5A4000"}
+    thead = '<th style="padding:5px 10px;color:#FFB300;font-size:0.6rem;letter-spacing:0.12em;border-bottom:1px solid #2A2A2A;white-space:nowrap">#</th>'
+    for _, hdr, align in col_defs:
+        thead += (
+            f'<th style="padding:5px 10px;color:#FFB300;font-size:0.6rem;'
+            f'letter-spacing:0.12em;border-bottom:1px solid #2A2A2A;'
+            f'text-align:{align};white-space:nowrap">{hdr}</th>'
+        )
+
+    tbody = ""
+    for rank, row in enumerate(df.itertuples(), start=1):
+        rank_color = medal_colors.get(rank, "#444")
+        rank_weight = "700" if rank <= 3 else "400"
+        tr = (
+            f'<td style="padding:5px 10px;color:{rank_color};font-weight:{rank_weight};'
+            f'text-align:center;border-bottom:1px solid #111;width:28px">#{rank}</td>'
+        )
+        for i, (attr, _, align) in enumerate(col_defs):
+            val = getattr(row, attr)
+            cell_color = _AMBER if i == medal_col and rank <= 3 else "#C8C8C8"
+            tr += (
+                f'<td style="padding:5px 10px;color:{cell_color};'
+                f'border-bottom:1px solid #111;text-align:{align};white-space:nowrap">{val}</td>'
+            )
+        tbody += f"<tr>{tr}</tr>"
+
+    return (
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:0.72rem;'
+        'overflow-x:auto;background:#0D0D0D;border:1px solid #1E1E1E;padding:4px">'
+        f'<table style="width:100%;border-collapse:collapse">'
+        f'<thead><tr>{thead}</tr></thead>'
+        f'<tbody>{tbody}</tbody>'
+        '</table></div>'
+    )
+
+
 with tab3:
+    lb_school = _get_school_leaderboard(city_filter, date_from, date_to, _TODAY)
+    lb_student = _get_student_leaderboard(city_filter, date_from, date_to, _TODAY)
+
+    col_lb1, col_lb2 = st.columns(2)
+
+    with col_lb1:
+        st.subheader("RANKING · COLEGIOS")
+        st.caption("ORDENADO POR USUARIOS ACTIVOS")
+        if not lb_school.empty:
+            st.markdown(
+                _lb_table(
+                    lb_school,
+                    col_defs=[
+                        ("colegio",     "COLEGIO",    "left"),
+                        ("ciudad",      "CIUDAD",     "left"),
+                        ("usuarios",    "USUARIOS",   "right"),
+                        ("sesion_prom", "SES. PROM",  "right"),
+                        ("sesion_max",  "SES. MAX",   "right"),
+                    ],
+                    medal_col=2,  # USUARIOS column
+                ),
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("NO DATA")
+
+    with col_lb2:
+        st.subheader("RANKING · ESTUDIANTES")
+        st.caption("TOP 50 · ORDENADO POR SESIÓN MÁX ALCANZADA")
+        if not lb_student.empty:
+            st.markdown(
+                _lb_table(
+                    lb_student,
+                    col_defs=[
+                        ("nombre",     "NOMBRE",    "left"),
+                        ("colegio",    "COLEGIO",   "left"),
+                        ("ciudad",     "CIUDAD",    "left"),
+                        ("sesiones",   "SESIONES",  "right"),
+                        ("sesion_max", "SES. MAX",  "right"),
+                    ],
+                    medal_col=3,  # SESIONES column
+                ),
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("NO DATA")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 4 — REPORTES
+# ════════════════════════════════════════════════════════════════════════════════
+
+with tab4:
     st.subheader("REPORTE DE USUARIOS")
     st.caption("GENERA UN EXCEL POR CIUDAD CON EL DETALLE DE CADA USUARIO Y SUS SESIONES")
 

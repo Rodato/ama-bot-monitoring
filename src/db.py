@@ -514,6 +514,88 @@ def get_available_sessions(city: Optional[str] = None) -> list:
     return query_df(sql, params).to_dict("records")
 
 
+def get_school_leaderboard(
+    city: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> pd.DataFrame:
+    df = date_from or START_DATE
+    dt = date_to or "9999-12-31"
+    city_clause = "AND u.city = :city" if city else ""
+    sql = f"""
+        WITH latest_user AS (
+            SELECT DISTINCT ON (client_number) client_number, school, city
+            FROM ama.ama_user_info_table_v1
+            ORDER BY client_number, created_at DESC
+        ),
+        active AS (
+            SELECT client_number, MAX(session::int) AS max_sesion
+            FROM ama.ama_session_start_table
+            WHERE DATE(created_at AT TIME ZONE 'America/Bogota') BETWEEN :date_from AND :date_to
+              AND client_number ~ '^(57|59)'
+            GROUP BY client_number
+        )
+        SELECT
+            COALESCE(u.school, 'Sin registrar') AS colegio,
+            COALESCE(u.city,   'Sin registrar') AS ciudad,
+            COUNT(DISTINCT a.client_number)     AS usuarios,
+            ROUND(AVG(a.max_sesion)::numeric, 1)AS sesion_prom,
+            MAX(a.max_sesion)                   AS sesion_max
+        FROM active a
+        LEFT JOIN latest_user u USING (client_number)
+        WHERE TRUE {city_clause}
+        GROUP BY colegio, ciudad
+        ORDER BY usuarios DESC, sesion_prom DESC
+    """
+    params: dict = {"date_from": df, "date_to": dt}
+    if city:
+        params["city"] = city
+    return query_df(sql, params)
+
+
+def get_student_leaderboard(
+    city: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 50,
+) -> pd.DataFrame:
+    df = date_from or START_DATE
+    dt = date_to or "9999-12-31"
+    city_clause = "AND u.city = :city" if city else ""
+    sql = f"""
+        WITH latest_user AS (
+            SELECT DISTINCT ON (client_number) client_number, name, school, city
+            FROM ama.ama_user_info_table_v1
+            ORDER BY client_number, created_at DESC
+        ),
+        progress AS (
+            SELECT
+                client_number,
+                COUNT(DISTINCT session::int) AS num_sesiones,
+                MAX(session::int)            AS max_sesion
+            FROM ama.ama_session_start_table
+            WHERE DATE(created_at AT TIME ZONE 'America/Bogota') BETWEEN :date_from AND :date_to
+              AND client_number ~ '^(57|59)'
+            GROUP BY client_number
+        )
+        SELECT
+            COALESCE(u.name,   'Sin registrar') AS nombre,
+            COALESCE(u.school, 'Sin registrar') AS colegio,
+            COALESCE(u.city,   'Sin registrar') AS ciudad,
+            p.num_sesiones                      AS sesiones,
+            p.max_sesion                        AS sesion_max
+        FROM progress p
+        LEFT JOIN latest_user u USING (client_number)
+        WHERE TRUE {city_clause}
+        ORDER BY p.max_sesion DESC, p.num_sesiones DESC
+        LIMIT :lim
+    """
+    params: dict = {"date_from": df, "date_to": dt, "lim": limit}
+    if city:
+        params["city"] = city
+    return query_df(sql, params)
+
+
 def get_responses(session: str, day: str, city: Optional[str] = None) -> pd.DataFrame:
     city_clause = "AND u.city = :city" if city else ""
     sql = f"""
